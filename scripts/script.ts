@@ -5,22 +5,25 @@ import Multipeer from 'Multipeer'
 import Patches from 'Patches'
 import Participants from "Participants";
 import Time from 'Time'
+
 var activeParticipants = [];
+var backgroundIndex = 0;
 var turnIndex = 0;
+const totalBackgroundCount = 3;
+
 (async function () {  // Enables async/await in JS [part 1]
 
     const self = await Participants.self;
     const participants = await Participants.getAllOtherParticipants();
-    participants.push(self);
 
-    const totalBackgroundCount = 3;
-    var backgroundIndex = 0;
 
     const syncBGChannel = Multipeer.getMessageChannel('syncBGTopic')
     const syncTurnChannel = Multipeer.getMessageChannel('SyncTurnTopic');
 
     const triggerPulseRequest = await Patches.outputs.getPulse('triggerPulseRequest');
     const turnPulseRequest = await Patches.outputs.getPulse('turnPulseRequest');
+
+    participants.push(self);
 
     participants.forEach(function (participant) {
         participant.isActiveInSameEffect.monitor().subscribeWithSnapshot({
@@ -38,7 +41,12 @@ var turnIndex = 0;
         }, function (event, snapshot) {
             onUserEnterOrLeave(snapshot.userIndex, event.newValue);
         });
-    })
+        activeParticipants.push(participant);
+    });
+    
+    sortActiveParticipantList();
+    checkShowTurnPanel();
+
     triggerPulseRequest.subscribe(() => {
         Diagnostics.log("Touch");
 
@@ -65,16 +73,15 @@ var turnIndex = 0;
         checkShowTurnPanel();
     });
 
-    sortActiveParticipantList();
-    checkShowTurnPanel();
+    
 
     turnPulseRequest.subscribe(() => {
-        if (activeParticipants[turnIndex].id == self.id) {
+        if (activeParticipants[turnIndex].id === self.id) {
             turnIndex = (turnIndex + 1) % activeParticipants.length;
             checkShowTurnPanel();
 
             syncTurnChannel.sendMessage({ 'turnIndex': turnIndex }, false).catch(err => {
-                Diagnostics.log(err);
+                Diagnostics.log(err); 
             })
         }
     });
